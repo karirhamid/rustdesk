@@ -3731,7 +3731,8 @@ Color? disabledTextColor(BuildContext context, bool enabled) {
 }
 
 Widget loadPowered(BuildContext context) {
-  if (bind.mainGetBuildinOption(key: "hide-powered-by-me") == 'Y') {
+  // RTDESK: no "powered by" line under the logo.
+  if (true || bind.mainGetBuildinOption(key: "hide-powered-by-me") == 'Y') {
     return SizedBox.shrink();
   }
   return MouseRegion(
