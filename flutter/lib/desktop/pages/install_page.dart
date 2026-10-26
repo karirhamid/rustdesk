@@ -170,10 +170,11 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isDarkTheme
-                        ? Color.fromARGB(135, 87, 87, 90)
-                        : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey),
+                        ? MyTheme.accentSoftDark
+                        : MyTheme.accentSoft,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: isDarkTheme ? MyTheme.borderDark : MyTheme.border),
                   ),
                   child: Row(
                     children: [
@@ -187,9 +188,9 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                           InkWell(
                             hoverColor: Colors.transparent,
                             onTap: () => launchUrlString(
-                                'https://rustdesk.com/privacy.html'),
+                                '$kRtdeskSiteUrl/conditions.html'),
                             child: Tooltip(
-                              message: 'https://rustdesk.com/privacy.html',
+                              message: '$kRtdeskSiteUrl/conditions.html',
                               child: Row(children: [
                                 Icon(Icons.launch_outlined, size: 16)
                                     .marginOnly(right: 5),

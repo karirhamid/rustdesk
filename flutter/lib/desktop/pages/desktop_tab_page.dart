@@ -96,14 +96,34 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
             backgroundColor: Theme.of(context).colorScheme.background,
             body: DesktopTab(
               controller: tabController,
-              tail: Offstage(
-                offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
-                child: ActionIcon(
-                  message: 'Settings',
-                  icon: IconFont.menu,
-                  onTap: DesktopTabPage.onAddSetting,
-                  isClose: false,
-                ),
+              tail: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // RTDESK: light / dark switch, as on the console.
+                  Builder(builder: (context) {
+                    final dark =
+                        Theme.of(context).brightness == Brightness.dark;
+                    return ActionIcon(
+                      message: dark ? 'Light Theme' : 'Dark Theme',
+                      icon: dark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined,
+                      onTap: () => MyTheme.changeDarkMode(
+                          dark ? ThemeMode.light : ThemeMode.dark),
+                      isClose: false,
+                    );
+                  }),
+                  Offstage(
+                    offstage:
+                        bind.isIncomingOnly() || bind.isDisableSettings(),
+                    child: ActionIcon(
+                      message: 'Settings',
+                      icon: IconFont.menu,
+                      onTap: DesktopTabPage.onAddSetting,
+                      isClose: false,
+                    ),
+                  ),
+                ],
               ),
             )));
     return isMacOS || kUseCompatibleUiMode

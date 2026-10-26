@@ -187,6 +187,8 @@ flutter:
           weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800
     - family: JetBrainsMono
       fonts:
         - asset: assets/fonts/JetBrainsMono-Regular.ttf

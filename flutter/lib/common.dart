@@ -3774,67 +3774,74 @@ Widget loadPowered(BuildContext context) {
   ).marginOnly(top: 6);
 }
 
-const _kDefaultLogoAsset = 'assets/logo.png';
-const _kLightLogoAsset = 'assets/logo_light.png';
-const _kDarkLogoAsset = 'assets/logo_dark.png';
+// RTDESK: the site that replaces rustdesk.com in every link of the client.
+const kRtdeskSiteUrl = 'https://karirhamid.github.io/rtdesk-site';
 
-List<String> _logoAssetCandidatesForBrightness(Brightness brightness) {
-  return brightness == Brightness.dark
-      ? [_kDarkLogoAsset, _kDefaultLogoAsset]
-      : [_kLightLogoAsset, _kDefaultLogoAsset];
-}
+/// The RTDesk wordmark, as on the console: "RT" heaviest in ink, "Desk" regular in slate, tight
+/// tracking; "RIRAKTECH HELPDESK" underneath in small spaced capitals. Drawn as text (Inter), so it
+/// stays sharp at every size and follows the light / dark theme.
+class RtdeskLogo extends StatelessWidget {
+  final double size;
+  final bool tagline;
 
-Future<String?> _resolveLogoAsset(Brightness brightness) async {
-  for (final asset in _logoAssetCandidatesForBrightness(brightness)) {
-    try {
-      await rootBundle.load(asset);
-      return asset;
-    } on FlutterError {
-      continue;
-    }
-  }
-  return null;
-}
-
-class _Logo extends StatefulWidget {
-  const _Logo();
-
-  @override
-  State<_Logo> createState() => _LogoState();
-}
-
-class _LogoState extends State<_Logo> {
-  final Map<Brightness, Future<String?>> _logoFutures = {};
-
-  Future<String?> _logoFutureFor(Brightness brightness) {
-    return _logoFutures.putIfAbsent(
-      brightness,
-      () => _resolveLogoAsset(brightness),
-    );
-  }
+  const RtdeskLogo({Key? key, this.size = 30, this.tagline = true})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: _logoFutureFor(Theme.of(context).brightness),
-      builder: (BuildContext context, AsyncSnapshot<String?> snapshot) {
-        final asset = snapshot.data;
-        if (asset != null) {
-          final image = Image.asset(
-            asset,
-            fit: BoxFit.contain,
-            errorBuilder: (ctx, error, stackTrace) {
-              return Container();
-            },
-          );
-          return Container(
-            constraints: BoxConstraints(maxWidth: 300, maxHeight: 60),
-            child: image,
-          ).marginOnly(left: 12, right: 12, top: 12);
-        }
-        return const Offstage();
-      },
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ink = dark ? const Color(0xFFF4F5F8) : const Color(0xFF141A2B);
+    final slate = dark ? const Color(0xFFA1ABBE) : const Color(0xFF586478);
+    final taglineColor =
+        dark ? const Color(0xFF808691) : const Color(0xFF808693);
+    final name = Text.rich(
+      TextSpan(children: [
+        TextSpan(
+            text: 'RT',
+            style: TextStyle(fontWeight: FontWeight.w800, color: ink)),
+        TextSpan(
+            text: 'Desk',
+            style: TextStyle(fontWeight: FontWeight.w400, color: slate)),
+      ]),
+      style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: size,
+          height: 1.0,
+          letterSpacing: -0.035 * size),
+      maxLines: 1,
+      softWrap: false,
     );
+    if (!tagline) return name;
+    final taglineSize = size * 0.404;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        name,
+        SizedBox(height: size * 0.14),
+        Text(
+          'RIRAKTECH HELPDESK',
+          style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: taglineSize,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.24 * taglineSize,
+              height: 1.0,
+              color: taglineColor),
+          maxLines: 1,
+          softWrap: false,
+        ),
+      ],
+    );
+  }
+}
+
+class _Logo extends StatelessWidget {
+  const _Logo();
+
+  @override
+  Widget build(BuildContext context) {
+    return const RtdeskLogo(size: 30).marginOnly(left: 12, right: 12, top: 20);
   }
 }
 

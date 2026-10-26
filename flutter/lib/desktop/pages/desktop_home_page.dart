@@ -436,14 +436,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 ),
             ],
           ),
-          SizedBox(
-            height: 6.0,
-          ),
-          if (!isOutgoingOnly)
-            Text(
-              translate("desk_tip"),
-              overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
+          if (isOutgoingOnly)
+            SizedBox(
+              height: 6.0,
             ),
           if (isOutgoingOnly)
             Text(
@@ -464,7 +459,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
       String btnText = isToUpdate ? 'Update' : 'Download';
       GestureTapCallback onPressed = () async {
-        final Uri url = Uri.parse('https://rustdesk.com/download');
+        final Uri url = Uri.parse('$kRtdeskSiteUrl/');
         await launchUrl(url);
       };
       if (isToUpdate) {
@@ -632,16 +627,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           margin: EdgeInsets.fromLTRB(
               0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
                   gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
-                ],
-              )),
-              padding: EdgeInsets.all(20),
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF545BE9),
+                      Color(0xFF33379B),
+                    ],
+                  )),
+              padding: EdgeInsets.all(18),
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -674,13 +671,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     FixedWidthButton(
-                                      width: 150,
+                                      width: 170,
                                       padding: 8,
                                       isOutline: true,
                                       text: translate(btnText),
                                       textColor: Colors.white,
-                                      borderColor: Colors.white,
-                                      textSize: 20,
+                                      borderColor: Colors.white70,
+                                      textSize: 15,
                                       radius: 10,
                                       onTap: onPressed,
                                     )
