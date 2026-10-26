@@ -457,13 +457,13 @@ class _CmHeaderState extends State<_CmHeader>
     super.build(context);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10.0),
+        borderRadius: BorderRadius.circular(14.0),
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [
-            Color(0xff00bfe1),
-            Color(0xff0071ff),
+            Color(0xFF6B79F9),
+            Color(0xFF4246C2),
           ],
         ),
       ),
@@ -960,7 +960,7 @@ class _CmControlPanel extends StatelessWidget {
               Expanded(
                 child: buildButton(
                   context,
-                  color: Colors.red,
+                  color: Color(0xFFDB2B33),
                   onClick: () => closeVoiceCall(),
                   icon: Icon(
                     Icons.call_end_rounded,
@@ -993,7 +993,7 @@ class _CmControlPanel extends StatelessWidget {
               Expanded(
                 child: buildButton(
                   context,
-                  color: Colors.red,
+                  color: Color(0xFFDB2B33),
                   onClick: () => handleVoiceCall(false),
                   icon: Icon(
                     Icons.phone_disabled_rounded,
@@ -1038,7 +1038,7 @@ class _CmControlPanel extends StatelessWidget {
           children: [
             Expanded(
               child: buildButton(context,
-                  color: Colors.redAccent,
+                  color: Color(0xFFDB2B33),
                   onClick: handleDisconnect,
                   text: 'Disconnect',
                   icon: Icon(
@@ -1083,7 +1083,7 @@ class _CmControlPanel extends StatelessWidget {
       children: [
         Offstage(
           offstage: !showElevation || !showAccept,
-          child: buildButton(context, color: Colors.green[700], onClick: () {
+          child: buildButton(context, color: Color(0xFF009956), onClick: () {
             handleAccept(context);
             handleElevate(context);
             windowManager.minimize();
@@ -1121,7 +1121,7 @@ class _CmControlPanel extends StatelessWidget {
               child: buildButton(
                 context,
                 color: Colors.transparent,
-                border: Border.all(color: Colors.grey),
+                border: Border.all(color: MyTheme.hoverBorder),
                 onClick: handleDisconnect,
                 text: 'Cancel',
                 textColor: null,

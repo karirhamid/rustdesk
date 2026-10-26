@@ -345,10 +345,11 @@ class _ConnectionPageState extends State<ConnectionPage>
   Widget _buildRemoteIDTextField(BuildContext context) {
     var w = Container(
       width: 320 + 20 * 2,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
       decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(13)),
-          border: Border.all(color: Theme.of(context).colorScheme.background)),
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.all(Radius.circular(14)),
+          border: Border.all(color: MyTheme.color(context).border!)),
       child: Ink(
         child: Column(
           children: [
@@ -420,8 +421,9 @@ class _ConnectionPageState extends State<ConnectionPage>
                           keyboardType: TextInputType.visiblePassword,
                           focusNode: fieldFocusNode,
                           style: const TextStyle(
-                            fontFamily: 'WorkSans',
-                            fontSize: 22,
+                            fontFamily: MyTheme.monoFont,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
                             height: 1.4,
                           ),
                           maxLines: 1,
@@ -519,21 +521,22 @@ class _ConnectionPageState extends State<ConnectionPage>
               padding: const EdgeInsets.only(top: 13.0),
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                 SizedBox(
-                  height: 28.0,
-                  child: ElevatedButton(
+                  height: 36.0,
+                  child: ElevatedButton.icon(
                     onPressed: () {
                       onConnect();
                     },
-                    child: Text(translate("Connect")),
+                    icon: const Icon(Icons.connected_tv_rounded, size: 16),
+                    label: Text(translate("Connect")),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  height: 28.0,
-                  width: 28.0,
+                  height: 36.0,
+                  width: 36.0,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).dividerColor),
-                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: MyTheme.color(context).border2!),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
                     child: StatefulBuilder(
