@@ -1643,6 +1643,38 @@ String _rtdeskLang() {
   return lang.split(RegExp('[-_]')).first.toLowerCase();
 }
 
+/// RTDESK: approve this install on the RTDESK server, which only lets approved devices in. The key
+/// comes from the build (custom.txt `rtdesk-enroll`, read from this app's own built-in settings, not
+/// the service's synced options); the stock RustDesk client has none, so it stays pending. Done once
+/// per ID; tried again later if the server cannot be reached or has not seen this device yet.
+Future<void> rtdeskEnroll() async {
+  const kEnrolledOption = 'rtdesk-enrolled';
+  final key = bind.mainGetBuildinOption(key: 'rtdesk-enroll');
+  if (key.isEmpty) return;
+  for (var attempt = 0; attempt < 45; attempt++) {
+    final id = await bind.mainGetMyId();
+    if (id.isNotEmpty) {
+      if (bind.mainGetLocalOption(key: kEnrolledOption) == id) return;
+      try {
+        final api = await bind.mainGetApiServer();
+        final resp = await http.post(Uri.parse('$api/api/rtdesk/enroll'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(
+                {'id': id, 'uuid': await bind.mainGetUuid(), 'key': key}));
+        if (resp.statusCode == 200) {
+          await bind.mainSetLocalOption(key: kEnrolledOption, value: id);
+          return;
+        }
+        // Wrong key, or a device the administrator disabled: asking again changes nothing.
+        if (resp.statusCode == 403 || resp.statusCode == 409) return;
+      } catch (e) {
+        debugPrint('rtdesk enroll: $e');
+      }
+    }
+    await Future.delayed(const Duration(seconds: 20));
+  }
+}
+
 String translate(String name) {
   if (name.startsWith('Failed to') && name.contains(': ')) {
     return name.split(': ').map((x) => translate(x)).join(': ');
