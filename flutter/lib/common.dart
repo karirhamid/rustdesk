@@ -1622,9 +1622,34 @@ Future<void> initGlobalFFI() async {
   Get.put<FFI>(_globalFFI, permanent: true);
 }
 
+// RTDESK: our own wording, applied over the engine's translations (src/lang/*.rs). Kept on the
+// Dart side so a text change shows at once in the live preview and needs no engine rebuild.
+// Keyed by language, then by the engine's text key; a language not listed keeps the engine's text.
+const Map<String, Map<String, String>> _rtdeskTexts = {
+  'fr': {
+    'Control Remote Desktop': 'Entrez l’adresse distante',
+  },
+  'en': {
+    'Control Remote Desktop': 'Enter remote address',
+  },
+};
+final Set<String> _rtdeskTextKeys =
+    _rtdeskTexts.values.expand((m) => m.keys).toSet();
+
+/// The language the engine translates into: the one chosen in the settings, else the system's.
+String _rtdeskLang() {
+  final chosen = bind.mainGetLocalOption(key: kCommConfKeyLang);
+  final lang = chosen.isEmpty || chosen == 'default' ? localeName : chosen;
+  return lang.split(RegExp('[-_]')).first.toLowerCase();
+}
+
 String translate(String name) {
   if (name.startsWith('Failed to') && name.contains(': ')) {
     return name.split(': ').map((x) => translate(x)).join(': ');
+  }
+  if (_rtdeskTextKeys.contains(name)) {
+    final text = _rtdeskTexts[_rtdeskLang()]?[name];
+    if (text != null) return text;
   }
   return platformFFI.translate(name, localeName);
 }
