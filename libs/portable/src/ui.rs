@@ -72,7 +72,7 @@ pub fn close() {
 
 type Rgb = [f32; 3];
 
-const fn rgb(hex: u32) -> Rgb {
+fn rgb(hex: u32) -> Rgb {
     [
         ((hex >> 16) & 0xff) as f32 / 255.0,
         ((hex >> 8) & 0xff) as f32 / 255.0,
@@ -80,47 +80,48 @@ const fn rgb(hex: u32) -> Rgb {
     ]
 }
 
-/// The client's palette (MyTheme and RtdeskLogo in flutter/lib/common.dart).
+/// The client's palette (MyTheme and RtdeskLogo in flutter/lib/common.dart), as 0xRRGGBB: `rgb`
+/// converts at use, since the build's Rust (1.75) has no float arithmetic in constants.
 struct Theme {
-    card: Rgb,
-    border: Rgb,
+    card: u32,
+    border: u32,
     glow: f32,
     shadow: f32,
-    ink: Rgb,
-    slate: Rgb,
-    tagline: Rgb,
-    track: Rgb,
-    accent: Rgb,
-    accent_light: Rgb,
-    shimmer: Rgb,
+    ink: u32,
+    slate: u32,
+    tagline: u32,
+    track: u32,
+    accent: u32,
+    accent_light: u32,
+    shimmer: u32,
 }
 
 const LIGHT: Theme = Theme {
-    card: rgb(0xFFFFFF),
-    border: rgb(0xE0E1E5),
+    card: 0xFFFFFF,
+    border: 0xE0E1E5,
     glow: 0.05,
     shadow: 0.22,
-    ink: rgb(0x141A2B),
-    slate: rgb(0x586478),
-    tagline: rgb(0x808693),
-    track: rgb(0xECEDF3),
-    accent: rgb(0x545BE9),
-    accent_light: rgb(0x8C9CFB),
-    shimmer: rgb(0x545BE9),
+    ink: 0x141A2B,
+    slate: 0x586478,
+    tagline: 0x808693,
+    track: 0xECEDF3,
+    accent: 0x545BE9,
+    accent_light: 0x8C9CFB,
+    shimmer: 0x545BE9,
 };
 
 const DARK: Theme = Theme {
-    card: rgb(0x1B1D25),
-    border: rgb(0x2C2F3A),
+    card: 0x1B1D25,
+    border: 0x2C2F3A,
     glow: 0.09,
     shadow: 0.55,
-    ink: rgb(0xF4F5F8),
-    slate: rgb(0xA1ABBE),
-    tagline: rgb(0x808691),
-    track: rgb(0x2C2F3A),
-    accent: rgb(0x545BE9),
-    accent_light: rgb(0x8C9CFB),
-    shimmer: rgb(0x8C9CFB),
+    ink: 0xF4F5F8,
+    slate: 0xA1ABBE,
+    tagline: 0x808691,
+    track: 0x2C2F3A,
+    accent: 0x545BE9,
+    accent_light: 0x8C9CFB,
+    shimmer: 0x8C9CFB,
 };
 
 struct Mask {
@@ -249,7 +250,7 @@ impl Splash {
                     let gy = (y as f32 + 0.5 - card_top) / (CARD_H * s * 0.6);
                     let glow = theme.glow * (-(gx * gx + gy * gy)).exp();
                     let edge = (card - clamp01(0.5 - (d + border))) / card;
-                    let color = lerp(lerp(theme.card, theme.accent, glow), theme.border, edge);
+                    let color = lerp(lerp(rgb(theme.card), rgb(theme.accent), glow), rgb(theme.border), edge);
                     pixel = over(pixel, color, card);
                 }
                 base[(y * w + x) as usize] = pixel;
@@ -282,9 +283,9 @@ impl Splash {
 
         // "RT" from the left, "Desk" from the right, then the tagline rising.
         let parts = [
-            (th.ink, 120.0, -14.0, 0.0),
-            (th.slate, 240.0, 14.0, 0.0),
-            (th.tagline, 470.0, 0.0, 7.0),
+            (rgb(th.ink), 120.0, -14.0, 0.0),
+            (rgb(th.slate), 240.0, 14.0, 0.0),
+            (rgb(th.tagline), 470.0, 0.0, 7.0),
         ];
         for (mask, &(color, start, from_x, from_y)) in self.masks.iter().zip(parts.iter()) {
             let k = ease_out_cubic((t - start) / 560.0);
@@ -307,7 +308,7 @@ impl Splash {
                     let mut c = color;
                     if let Some(center) = sweep {
                         let dist = (x as f32 + 0.35 * (y - gy) as f32 - center) / band;
-                        c = lerp(c, th.shimmer, 0.9 * (-dist * dist).exp());
+                        c = lerp(c, rgb(th.shimmer), 0.9 * (-dist * dist).exp());
                     }
                     let i = (y * self.w + x) as usize;
                     out[i] = over(out[i], c, coverage as f32 / 255.0 * k);
@@ -332,7 +333,7 @@ impl Splash {
                 let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
                 let track = rounded_rect(px - (bx + bw / 2.0), py - (by + bh / 2.0), bw / 2.0, bh / 2.0, radius);
                 let i = (y * self.w + x) as usize;
-                out[i] = over(out[i], th.track, clamp01(0.5 - track) * shown);
+                out[i] = over(out[i], rgb(th.track), clamp01(0.5 - track) * shown);
                 if head - tail > 0.5 {
                     let seg = rounded_rect(
                         px - (tail + head) / 2.0,
@@ -343,7 +344,7 @@ impl Splash {
                     )
                     .max(track);
                     let along = clamp01((px - tail) / (head - tail).max(1.0));
-                    let color = lerp(th.accent, th.accent_light, along);
+                    let color = lerp(rgb(th.accent), rgb(th.accent_light), along);
                     out[i] = over(out[i], color, clamp01(0.5 - seg) * shown);
                 }
             }
