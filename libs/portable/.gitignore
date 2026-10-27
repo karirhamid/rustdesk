@@ -1,3 +1,5 @@
 /target
 *.exe
 *.bin
+# the splash glyphs (splash.py) are source, unlike the generated data.bin
+!src/res/splash.bin

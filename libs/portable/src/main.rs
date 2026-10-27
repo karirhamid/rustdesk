@@ -157,7 +157,6 @@ fn setup(
     dir: Option<PathBuf>,
     clear: bool,
     _args: &Vec<String>,
-    _ui: &mut bool,
 ) -> Option<PathBuf> {
     let dir = if let Some(dir) = dir {
         dir
@@ -173,11 +172,6 @@ fn setup(
 
     let mut ts = 0;
     if clear || !is_timestamp_matches(&dir, &mut ts) {
-        #[cfg(windows)]
-        if _args.is_empty() {
-            *_ui = true;
-            ui::setup();
-        }
         std::fs::remove_dir_all(&dir).ok();
     }
     let mut metadata_paths = reader.package_paths.clone();
@@ -227,7 +221,7 @@ fn is_windows_7() -> bool {
     false
 }
 
-fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
+fn execute(path: PathBuf, args: Vec<String>, _ui: bool) -> Option<std::process::Child> {
     println!("executing {}", path.display());
     // setup env
     let exe = std::env::current_exe().unwrap_or_default();
@@ -258,7 +252,7 @@ fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
 
     #[cfg(windows)]
     if _ui {
-        match _child {
+        match &_child {
             Ok(child) => unsafe {
                 winapi::um::winuser::AllowSetForegroundWindow(child.id() as u32);
             },
@@ -267,6 +261,7 @@ fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
             }
         }
     }
+    _child.ok()
 }
 
 fn main() -> Result<(), String> {
@@ -287,21 +282,36 @@ fn main() -> Result<(), String> {
     #[cfg(not(windows))]
     let quick_support = false;
 
-    let mut ui = false;
+    // Opened by hand (no arguments): the splash covers unpacking and the app's own start, and
+    // fades out once the app's window is up.
+    let ui = cfg!(windows) && args.is_empty();
+    #[cfg(windows)]
+    if ui {
+        ui::setup();
+    }
     let reader = BinaryReader::new()?;
     if let Some(exe) = setup(
         reader,
         None,
         click_setup || args.contains(&"--silent-install".to_owned()),
         &args,
-        &mut ui,
     ) {
         if click_setup {
             args = vec!["--install".to_owned()];
         } else if quick_support {
             args = vec!["--quick_support".to_owned()];
         }
-        execute(exe, args, ui);
+        let _child = execute(exe, args, ui);
+        #[cfg(windows)]
+        if ui {
+            if let Some(mut child) = _child {
+                win::wait_for_window(&mut child, std::time::Duration::from_secs(15));
+            }
+        }
+    }
+    #[cfg(windows)]
+    if ui {
+        ui::close();
     }
     Ok(())
 }
@@ -332,6 +342,47 @@ mod win {
             .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
             .output();
         let _allow_err = std::fs::copy(src, &format!("{}\\{}", dir.to_string_lossy(), tgt));
+    }
+
+    /// Waits until `child` shows a window (or exits, or `limit` passes): the splash stays up while
+    /// the app starts, so there is no moment with nothing on screen.
+    pub(super) fn wait_for_window(child: &mut std::process::Child, limit: std::time::Duration) {
+        use winapi::shared::minwindef::{BOOL, LPARAM, TRUE};
+        use winapi::shared::windef::{HWND, RECT};
+        use winapi::um::winuser::{EnumWindows, GetWindowRect, GetWindowThreadProcessId, IsWindowVisible};
+
+        struct Search {
+            pid: u32,
+            found: bool,
+        }
+        unsafe extern "system" fn visit(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let search = &mut *(lparam as *mut Search);
+            let mut pid = 0;
+            GetWindowThreadProcessId(hwnd, &mut pid);
+            if pid == search.pid && IsWindowVisible(hwnd) != 0 {
+                let mut rect: RECT = std::mem::zeroed();
+                GetWindowRect(hwnd, &mut rect);
+                // Not the 1x1 helper windows a process keeps around.
+                if rect.right - rect.left > 120 && rect.bottom - rect.top > 120 {
+                    search.found = true;
+                    return 0;
+                }
+            }
+            TRUE
+        }
+
+        let start = std::time::Instant::now();
+        let mut search = Search { pid: child.id(), found: false };
+        while start.elapsed() < limit {
+            if matches!(child.try_wait(), Ok(Some(_)) | Err(_)) {
+                return;
+            }
+            unsafe { EnumWindows(Some(visit), &mut search as *mut Search as LPARAM) };
+            if search.found {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
     }
 
     /// Check if the executable is a Quick Support version.
