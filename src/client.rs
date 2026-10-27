@@ -1523,7 +1523,7 @@ impl Client {
             (None, false) => select_ok(direct_futures).await.map(|c| c.0),
             (None, true) => Err(anyhow!("No direct transport available")),
         };
-        let (mut conn, kcp, mut typ, mut direct) = match direct_result {
+        let (mut conn, mut kcp, mut typ, mut direct) = match direct_result {
             Ok((conn, kcp, typ, direct)) => (Ok(conn), kcp, typ, direct),
             Err(e) => (Err(e), None, "", false),
         };
@@ -1571,11 +1571,12 @@ impl Client {
         let res = Self::secure_connection(peer_id, signed_id_pk.clone(), key, &mut conn).await;
         let pk: Option<Vec<u8>> = match res {
             Ok(pk) => pk,
-            Err(e) if typ == "WebRTC" && !relay_server.is_empty() => {
-                // WebRTC won the race but identity/DTLS binding failed; fall back to a freshly
-                // coordinated relay instead of failing the whole attempt. The guard is dropped
-                // first so the bad pc is closed promptly.
-                log::warn!("WebRTC secure handshake failed ({}), falling back to relay", e);
+            Err(e) if typ != "Relay" && !relay_server.is_empty() => {
+                // A direct transport won the race but the peer's handshake never came through it
+                // (a punch "connected" one way only, or WebRTC identity/DTLS binding failed): fall
+                // back to a freshly coordinated relay instead of failing the whole attempt with
+                // "deadline has elapsed". The guard is dropped first so a bad pc is closed promptly.
+                log::warn!("{} secure handshake failed ({}), falling back to relay", typ, e);
                 drop(webrtc_guard.take());
                 match Self::request_relay(
                     peer_id,
@@ -1595,6 +1596,8 @@ impl Client {
                         {
                             Ok(pk) => {
                                 conn = relay_conn;
+                                // The UDP session that failed is not the transport any more.
+                                kcp = None;
                                 typ = "Relay";
                                 direct = false;
                                 pk
