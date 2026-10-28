@@ -388,12 +388,14 @@ impl Client {
                 }
             }
             Ok(x) => {
-                // Set x.2 to true only in the connect() function to indicate that direct_failures needs to be updated; everywhere else it should be set to false.
+                // Set x.2 to true only in the connect() function, or on a relay-first round, to indicate that direct_failures needs to be updated; everywhere else it should be set to false.
                 if x.2 {
                     let direct_failures = interface.get_lch().read().unwrap().direct_failures;
                     let direct = x.0 .1;
-                    if !interface.is_force_relay() && (direct_failures == 0) != direct {
-                        let n = if direct { 0 } else { 1 };
+                    // A count of consecutive relay connections, not a flag: it decides when a
+                    // relay-first peer gets its next direct attempt (see RETRY_DIRECT_EVERY).
+                    let n = if direct { 0 } else { direct_failures.saturating_add(1) };
+                    if !interface.is_force_relay() && n != direct_failures {
                         log::info!("direct_failures updated to {}", n);
                         interface.get_lch().write().unwrap().set_direct_failure(n);
                     }
@@ -660,6 +662,20 @@ impl Client {
     /// busy proxy's occasional ~80ms handshake slip through and silently drop UDP punch.
     const TCP_RTT_PLAUSIBLE_MIN: Duration = Duration::from_millis(100);
 
+    /// How long a direct transport may take to carry the peer's first message when the relay
+    /// can take over. The controlled side sends its signed id as soon as it accepts, so a real
+    /// direct path delivers it within a round trip; one that connected but stays silent was
+    /// answered by something in between (a firewall completing the TCP handshake for the
+    /// peer), and waiting READ_TIMEOUT (18s) on it was most of the time before the relay.
+    const DIRECT_HANDSHAKE_WAIT_MS: u64 = 3_000;
+    /// WebRTC's is longer: the first message is the data channel's first use after ICE + DTLS.
+    const DIRECT_HANDSHAKE_WAIT_WEBRTC_MS: u64 = 5_000;
+
+    /// A peer reached only through the relay last time goes to the relay first, skipping the
+    /// direct attempt that would only time out again. Every RETRY_DIRECT_EVERY-th consecutive
+    /// relay connection tries direct once more, so a network that changed gets P2P back.
+    const RETRY_DIRECT_EVERY: i32 = 5;
+
     /// Delay before re-sending an ICE candidate over the rendezvous route once. The hop to the
     /// peer can be UDP (the controlled side's mediator channel), so a candidate can be lost in
     /// flight; the remote ICE agent dedups repeats, so the second copy is free.
@@ -840,7 +856,20 @@ impl Client {
         let mut is_local = false;
         let mut feedback = 0;
         use hbb_common::protobuf::Enum;
-        let nat_type = if interface.is_force_relay() {
+        // Relay first by reporting a symmetric NAT, not force_relay: the controlled side then
+        // relays the legacy transports at once but still answers WebRTC with full ICE.
+        let direct_failures = interface.get_lch().read().unwrap().direct_failures;
+        let relay_first = !interface.is_force_relay()
+            && direct_failures > 0
+            && direct_failures % Self::RETRY_DIRECT_EVERY != 0;
+        if relay_first {
+            log::info!(
+                "relay first: the last {} connection(s) to {} used the relay",
+                direct_failures,
+                peer
+            );
+        }
+        let nat_type = if interface.is_force_relay() || relay_first {
             NatType::SYMMETRIC
         } else {
             NatType::from_i32(my_nat_type).unwrap_or(NatType::UNKNOWN_NAT)
@@ -1251,7 +1280,7 @@ impl Client {
                         return Ok((
                             (conn, direct, pk, kcp, typ),
                             (feedback, rendezvous_server),
-                            false,
+                            relay_first,
                         ));
                     }
                     Some(rendezvous_message::Union::IceCandidate(ice)) => {
@@ -1568,7 +1597,24 @@ impl Client {
             start.elapsed(),
             punch_type
         );
-        let res = Self::secure_connection(peer_id, signed_id_pk.clone(), key, &mut conn).await;
+        let res = if typ != "Relay" && !relay_server.is_empty() {
+            let wait = if typ == "WebRTC" {
+                Self::DIRECT_HANDSHAKE_WAIT_WEBRTC_MS
+            } else {
+                Self::DIRECT_HANDSHAKE_WAIT_MS
+            };
+            match timeout(
+                wait,
+                Self::secure_connection(peer_id, signed_id_pk.clone(), key, &mut conn),
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            Self::secure_connection(peer_id, signed_id_pk.clone(), key, &mut conn).await
+        };
         let pk: Option<Vec<u8>> = match res {
             Ok(pk) => pk,
             Err(e) if typ != "Relay" && !relay_server.is_empty() => {

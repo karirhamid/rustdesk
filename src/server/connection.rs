@@ -4622,7 +4622,10 @@ impl Connection {
             err = "No permission".to_string();
         } else {
             err = "No need to elevate".to_string();
-            if !crate::platform::is_installed() && !portable_client::running() {
+            // Not is_installed(): an installed copy whose connection is handled outside the
+            // service (an RDP session, the service stopped) runs as the user, and the controller
+            // offers elevation exactly then (sas_enabled is is_root()).
+            if !crate::platform::is_root() && !portable_client::running() {
                 err = portable_client::start_portable_service(para)
                     .err()
                     .map_or("".to_string(), |e| e.to_string());
@@ -5575,7 +5578,7 @@ impl Connection {
 
     #[cfg(windows)]
     fn portable_check(&mut self) {
-        if self.portable.is_installed || !self.is_remote() || !self.keyboard {
+        if self.portable.is_system || !self.is_remote() || !self.keyboard {
             return;
         }
         let running = portable_client::running();
@@ -6647,14 +6650,14 @@ pub struct PortableState {
     pub last_uac: bool,
     pub last_foreground_window_elevated: bool,
     pub last_running: Option<bool>,
-    pub is_installed: bool,
+    pub is_system: bool,
 }
 
 #[cfg(windows)]
 impl Default for PortableState {
     fn default() -> Self {
         Self {
-            is_installed: crate::platform::is_installed(),
+            is_system: crate::platform::is_root(),
             last_uac: Default::default(),
             last_foreground_window_elevated: Default::default(),
             last_running: Default::default(),
