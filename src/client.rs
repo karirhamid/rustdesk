@@ -31,7 +31,7 @@ use crate::{
     create_symmetric_key_msg, decode_id_pk, decode_id_pk_dtls, dtls_fingerprint_bound, get_rs_pk,
     is_keyboard_mode_supported,
     kcp_stream::KcpStream,
-    secure_tcp, secure_tcp_required,
+    secure_tcp_required,
     ui_interface::{get_builtin_option, resolve_avatar_url, use_texture_render},
     ui_session_interface::{InvokeUiSession, Session},
 };
@@ -903,8 +903,12 @@ impl Client {
                 }
             }
         }
-        if !exchanged && legacy_secure {
-            secure_tcp(&mut socket, &key)
+        // Every punch request goes out encrypted, not only signed-in ones: it names the peer being
+        // called and this machine's NAT. hbbs offers the exchange on every connection, so this
+        // costs no extra round trip, and a server that does not complete it is an error rather
+        // than a reason to send the request in the clear.
+        if !exchanged && !key.is_empty() {
+            secure_tcp_required(&mut socket, &key)
                 .await
                 .map_err(|e| anyhow!("Failed to secure tcp: {}", e))?;
         }
@@ -1844,8 +1848,9 @@ impl Client {
                 .await
                 .with_context(|| "Failed to connect to rendezvous server")?;
 
-            if !key.is_empty() && (!token.is_empty() || !switch_code.is_empty()) {
-                secure_tcp(&mut socket, key).await?;
+            // Encrypted for everyone, like the punch request (see _start_inner).
+            if !key.is_empty() {
+                secure_tcp_required(&mut socket, key).await?;
             }
 
             ipv4 = socket.local_addr().is_ipv4();

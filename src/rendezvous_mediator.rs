@@ -718,20 +718,10 @@ impl RendezvousMediator {
         );
 
         let mut socket = connect_tcp(&*self.host, CONNECT_TIMEOUT).await?;
-        // A relay response carrying an answer carries this machine's ICE candidates with it, so
-        // that half goes out only on an encrypted channel. A server that does not complete the
-        // exchange loses the answer, not the relay: the response goes without it, on a fresh
-        // socket since the failed exchange may have consumed a message on this one, and the
-        // controller falls back to its other transports.
-        let mut webrtc_sdp_answer = webrtc_sdp_answer;
-        if !webrtc_sdp_answer.is_empty() {
-            let key = crate::get_key(true).await;
-            if let Err(err) = crate::secure_tcp_required(&mut socket, &key).await {
-                log::warn!("relaying without the WebRTC answer, it cannot be encrypted: {err}");
-                webrtc_sdp_answer = String::new();
-                socket = connect_tcp(&*self.host, CONNECT_TIMEOUT).await?;
-            }
-        }
+        // The relay response (this machine's ID, the relay uuid, its addresses and, with an
+        // answer, its ICE candidates) always goes out encrypted; a server that does not complete
+        // the exchange gets no response at all rather than one in the clear.
+        crate::secure_tcp_required(&mut socket, &crate::get_key(true).await).await?;
 
         let mut msg_out = Message::new();
         let mut rr = RelayResponse {
@@ -1184,6 +1174,9 @@ impl RendezvousMediator {
             allow_err!(socket_client::connect_tcp_local(peer_addr, Some(local_addr), 30).await);
             socket
         };
+        // Encrypted like the relay response; hbbs still reads the mapped port off this socket's
+        // source address, which the exchange does not change.
+        crate::secure_tcp_required(&mut socket, &crate::get_key(true).await).await?;
         let mut msg_out = Message::new();
         msg_out.set_punch_hole_sent(msg_punch);
         let bytes = msg_out.write_to_bytes()?;
