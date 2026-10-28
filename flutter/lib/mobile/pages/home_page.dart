@@ -43,6 +43,8 @@ class HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     initPages();
+    // RTDESK: approve this install on the server, as the desktop app does on its home page.
+    if (!isWeb) rtdeskEnroll();
   }
 
   void initPages() {
@@ -79,7 +81,13 @@ class HomePageState extends State<HomePage> {
             title: appTitle(),
             actions: _pages.elementAt(_selectedIndex).appBarActions,
           ),
-          bottomNavigationBar: BottomNavigationBar(
+          // RTDESK: a flat bar on the page colour with a hairline above, accent for the open tab.
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(
+                  top: BorderSide(color: MyTheme.color(context).border!)),
+            ),
+            child: BottomNavigationBar(
             key: navigationBarKey,
             items: _pages
                 .map((page) =>
@@ -87,8 +95,11 @@ class HomePageState extends State<HomePage> {
                 .toList(),
             currentIndex: _selectedIndex,
             type: BottomNavigationBarType.fixed,
-            selectedItemColor: MyTheme.accent, //
-            unselectedItemColor: MyTheme.darkGray,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            elevation: 0,
+            selectedItemColor: MyTheme.accent,
+            unselectedItemColor: Theme.of(context).textTheme.bodySmall?.color,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
             onTap: (index) => setState(() {
               // close chat overlay when go chat page
               if (_selectedIndex != index) {
@@ -101,6 +112,7 @@ class HomePageState extends State<HomePage> {
                 }
               }
             }),
+            ),
           ),
           body: _pages.elementAt(_selectedIndex),
         ));
@@ -150,7 +162,8 @@ class HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Text(bind.mainGetAppNameSync());
+    // RTDESK: the wordmark, as at the top of the console and of the desktop app.
+    return const RtdeskLogo(size: 22, tagline: false);
   }
 }
 

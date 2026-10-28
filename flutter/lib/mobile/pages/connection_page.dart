@@ -148,20 +148,31 @@ class _ConnectionPageState extends State<ConnectionPage> {
   /// UI for the remote ID TextField.
   /// Search for a peer and connect to it if the id exists.
   Widget _buildRemoteIDTextField() {
-    final w = SizedBox(
-      height: 84,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.all(Radius.circular(13)),
-          ),
-          child: Row(
+    // RTDESK: the desktop connection card - its title, the ID in a rounded field and a
+    // full-width button instead of a bare arrow.
+    final w = Container(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MyTheme.color(context).border!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          getConnectionPageTitle(context, false).marginOnly(bottom: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).hoverColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: MyTheme.color(context).border!),
+            ),
+            child: Row(
             children: <Widget>[
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.only(left: 16, right: 16),
+                  padding: const EdgeInsets.only(left: 14, right: 4),
                   child: RawAutocomplete<Peer>(
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       if (textEditingValue.text == '') {
@@ -231,13 +242,20 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           _idController.id = text;
                         },
                         style: const TextStyle(
-                          fontFamily: 'WorkSans',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 30,
-                          color: MyTheme.idColor,
+                          fontFamily: MyTheme.monoFont,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
                         ),
                         decoration: InputDecoration(
-                          labelText: translate('Remote ID'),
+                          hintText: translate('Enter Remote ID'),
+                          hintStyle: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: Theme.of(context).hintColor,
+                          ),
+                          filled: false,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                           // hintText: 'Enter your remote ID',
                           border: InputBorder.none,
                           helperStyle: const TextStyle(
@@ -334,18 +352,19 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         },
                         icon: Icon(Icons.clear, color: MyTheme.darkGray)),
                   )),
-              SizedBox(
-                width: 60,
-                height: 60,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_forward,
-                      color: MyTheme.darkGray, size: 45),
-                  onPressed: onConnect,
-                ),
-              ),
             ],
           ),
-        ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: onConnect,
+              icon: const Icon(Icons.connected_tv_rounded, size: 18),
+              label: Text(translate('Connect')),
+            ),
+          ),
+        ],
       ),
     );
     final child = Column(children: [

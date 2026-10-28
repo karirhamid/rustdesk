@@ -468,10 +468,42 @@ class ServerInfo extends StatelessWidget {
     const Color colorNegative = Colors.red;
     const double iconMarginRight = 15;
     const double iconSize = 24;
-    const TextStyle textStyleHeading = TextStyle(
-        fontSize: 16.0, fontWeight: FontWeight.bold, color: Colors.grey);
-    const TextStyle textStyleValue =
-        TextStyle(fontSize: 25.0, fontWeight: FontWeight.bold);
+
+    // RTDESK: the desktop home's boards - a small capitalised label over a rounded box.
+    Widget boardLabel(String text) => Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.6,
+            color: Theme.of(context).textTheme.bodySmall?.color,
+          ),
+        );
+    Widget board(String value, List<Widget> actions) => Container(
+          margin: const EdgeInsets.only(top: 6, bottom: 14),
+          padding: const EdgeInsets.only(left: 14, right: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).hoverColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: MyTheme.color(context).border!),
+          ),
+          child: Row(children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontFamily: MyTheme.monoFont,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            ...actions,
+          ]),
+        );
 
     void copyToClipboard(String value) {
       Clipboard.setData(ClipboardData(text: value));
@@ -506,59 +538,35 @@ class ServerInfo extends StatelessWidget {
     return PaddingCard(
         title: translate('Your Device'),
         child: Column(
-          // ID
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              const Icon(Icons.perm_identity,
-                      color: Colors.grey, size: iconSize)
-                  .marginOnly(right: iconMarginRight),
-              Text(
-                translate('ID'),
-                style: textStyleHeading,
-              )
-            ]),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(
-                model.serverId.value.text,
-                style: textStyleValue,
-              ),
+            boardLabel(translate('ID')),
+            board(model.serverId.value.text, [
               IconButton(
                   visualDensity: VisualDensity.compact,
-                  icon: Icon(Icons.copy_outlined),
+                  icon: const Icon(Icons.copy_rounded, size: 20),
+                  tooltip: translate('Copy'),
                   onPressed: () {
                     copyToClipboard(model.serverId.value.text.trim());
                   })
-            ]).marginOnly(left: 39, bottom: 10),
-            // Password
-            Row(children: [
-              const Icon(Icons.lock_outline, color: Colors.grey, size: iconSize)
-                  .marginOnly(right: iconMarginRight),
-              Text(
-                translate('One-time Password'),
-                style: textStyleHeading,
-              )
             ]),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(
-                !showOneTime ? '-' : model.serverPasswd.value.text,
-                style: textStyleValue,
-              ),
-              !showOneTime
-                  ? SizedBox.shrink()
-                  : Row(children: [
-                      IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.refresh),
-                          onPressed: () => bind.mainUpdateTemporaryPassword()),
-                      IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: Icon(Icons.copy_outlined),
-                          onPressed: () {
-                            copyToClipboard(
-                                model.serverPasswd.value.text.trim());
-                          })
-                    ])
-            ]).marginOnly(left: 40, bottom: 15),
+            boardLabel(translate('One-time Password')),
+            board(!showOneTime ? '-' : model.serverPasswd.value.text, [
+              if (showOneTime)
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.refresh_rounded, size: 20),
+                    tooltip: translate('Refresh Password'),
+                    onPressed: () => bind.mainUpdateTemporaryPassword()),
+              if (showOneTime)
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.copy_rounded, size: 20),
+                    tooltip: translate('Copy'),
+                    onPressed: () {
+                      copyToClipboard(model.serverPasswd.value.text.trim());
+                    })
+            ]),
             ConnectionStateNotification()
           ],
         ));
@@ -830,21 +838,20 @@ class PaddingCard extends StatelessWidget {
                 ],
               )));
     }
-    return SizedBox(
-        width: double.maxFinite,
-        child: Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
-          ),
-          margin: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 0),
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
-            child: Column(
-              children: children,
-            ),
-          ),
-        ));
+    // RTDESK: a flat card with a hairline border, as on the desktop and the console.
+    return Container(
+      width: double.maxFinite,
+      margin: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 0),
+      padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 18.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MyTheme.color(context).border!),
+      ),
+      child: Column(
+        children: children,
+      ),
+    );
   }
 }
 

@@ -389,6 +389,11 @@ class MyTheme {
     dialogBackgroundColor: Colors.white,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
+      // RTDESK: on phones the bar is white with a hairline, like the console's top bar.
+      backgroundColor: isDesktop ? null : Colors.white,
+      foregroundColor: isDesktop ? null : content,
+      elevation: isDesktop ? null : 0,
+      shape: isDesktop ? null : const Border(bottom: BorderSide(color: border)),
     ),
     dialogTheme: DialogTheme(
       elevation: 15,
@@ -492,6 +497,12 @@ class MyTheme {
     dialogBackgroundColor: Color(0xFF121319),
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
+      backgroundColor: isDesktop ? null : const Color(0xFF121319),
+      foregroundColor: isDesktop ? null : const Color(0xFFF4F5F8),
+      elevation: isDesktop ? null : 0,
+      shape: isDesktop
+          ? null
+          : const Border(bottom: BorderSide(color: borderDark)),
     ),
     dialogTheme: DialogTheme(
       elevation: 15,
