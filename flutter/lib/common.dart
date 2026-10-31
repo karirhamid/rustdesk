@@ -1210,6 +1210,7 @@ void msgBox(SessionID sessionId, String type, String title, String text,
     {bool? hasCancel,
     ReconnectHandle? reconnect,
     int? reconnectTimeout,
+    ReconnectHandle? manualReconnect,
     VoidCallback? onSubmit,
     int? submitTimeout}) {
   dialogManager.dismissAll();
@@ -1325,6 +1326,19 @@ void msgBox(SessionID sessionId, String type, String title, String text,
               : null,
         ));
     buttons.insert(0, button);
+  }
+  if (manualReconnect != null) {
+    final enabled = true.obs;
+    buttons.insert(
+        0,
+        Obx(() => dialogButton('Reconnect',
+            onPressed: enabled.isTrue
+                ? () {
+                    enabled.value = false;
+                    manualReconnect(dialogManager, sessionId, false);
+                  }
+                : null,
+            isOutline: true)));
   }
   if (link.isNotEmpty) {
     buttons.insert(0, dialogButton('JumpLink', onPressed: jumplink));
@@ -1639,11 +1653,34 @@ Future<void> initGlobalFFI() async {
 const Map<String, Map<String, String>> _rtdeskTexts = {
   'fr': {
     'Control Remote Desktop': 'Entrez l’adresse distante',
+    kRtdeskNotApprovedTitle: 'Appareil non approuvé',
+    kRtdeskDeviceNotApproved:
+        'Cet appareil n’est pas encore approuvé, il ne peut donc pas ouvrir de session. Contactez le support à support@riraktech.ma pour le faire approuver.',
+    kRtdeskRemoteNotApproved:
+        'L’appareil distant n’est pas encore approuvé, il ne peut donc pas être joint. Contactez le support à support@riraktech.ma pour le faire approuver.',
   },
   'en': {
     'Control Remote Desktop': 'Enter remote address',
   },
 };
+const kRtdeskNotApprovedTitle = 'Device not approved';
+const kRtdeskDeviceNotApproved =
+    'This device is not approved yet, so it cannot start a session. Contact support at support@riraktech.ma to have it approved.';
+const kRtdeskRemoteNotApproved =
+    'The remote device is not approved yet, so it cannot be reached. Contact support at support@riraktech.ma to have it approved.';
+
+/// RTDESK: the text to show when the server refused the session because this device (or the
+/// remote one) is not approved, or null for any other message. The server's own wording names an
+/// administrator; ours names support instead.
+String? rtdeskNotApprovedText(String type, String text) {
+  if (!type.contains('error')) return null;
+  final lower = text.toLowerCase();
+  if (!lower.contains('not approved')) return null;
+  return lower.contains('remote device')
+      ? kRtdeskRemoteNotApproved
+      : kRtdeskDeviceNotApproved;
+}
+
 final Set<String> _rtdeskTextKeys =
     _rtdeskTexts.values.expand((m) => m.keys).toSet();
 

@@ -960,6 +960,16 @@ class FfiModel with ChangeNotifier {
       final hasRetry = evt['hasRetry'] == 'true';
       showPrivacyFailedDialog(
           sessionId, type, title, text, link, hasRetry, dialogManager);
+    } else if (rtdeskNotApprovedText(type, text) != null) {
+      // RTDESK: retrying cannot help until the device is approved, so no automatic retry (it
+      // used to try again every few seconds); the user reconnects by hand once support has acted.
+      _timer?.cancel();
+      _timer = null;
+      _reconnects = 1;
+      _offlineReconnectStartTime = null;
+      msgBox(sessionId, type, kRtdeskNotApprovedTitle,
+          rtdeskNotApprovedText(type, text)!, '', dialogManager,
+          manualReconnect: reconnect);
     } else {
       var hasRetry = evt['hasRetry'] == 'true';
       if (!hasRetry) {
