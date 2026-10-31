@@ -40,6 +40,12 @@ String formatID(String id) {
     suffix = id2.substring(id2.length - 2, id2.length);
     id2 = id2.substring(0, id2.length - 2);
   }
+  // RTDESK: "MA" + digits is grouped like a plain number, after the prefix.
+  final rtdesk = RegExp(r'^ma(\d*)$', caseSensitive: false).firstMatch(id2);
+  if (rtdesk != null) {
+    final digits = rtdesk.group(1)!;
+    return 'MA${digits.isEmpty ? '' : ' ${formatID(digits)}'}$suffix';
+  }
   if (int.tryParse(id2) == null) return id;
   String newID = '';
   if (id2.length <= 3) {
