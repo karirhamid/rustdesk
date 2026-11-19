@@ -2631,10 +2631,8 @@ class _KeyboardMenu extends StatelessWidget {
           continue;
         }
 
-        var text = translate(mode.menu);
-        if (mode.key == kKeyTranslateMode) {
-          text = '$text beta';
-        }
+        // RTDESK: Translate is the default mode, so it is not labelled "beta".
+        final text = translate(mode.menu);
         list.add(RdoMenuButton<String>(
           child: Text(text),
           value: mode.key,

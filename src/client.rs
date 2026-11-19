@@ -3028,7 +3028,29 @@ impl LoginConfigHandler {
 
         self.id = id;
         self.conn_type = conn_type;
-        let config = self.load_config();
+        let mut config = self.load_config();
+        // RTDESK: peers saved before the new picture defaults (best quality, 60 fps) still hold
+        // the old ones (balanced, 30 fps). Move them over once; later choices are kept.
+        const RTDESK_PICTURE_DEFAULT: &str = "rtdesk-picture-best";
+        if !config.options.contains_key(RTDESK_PICTURE_DEFAULT) {
+            if config.image_quality == "balanced" {
+                config.image_quality = crate::common::RTDESK_IMAGE_QUALITY.to_owned();
+            }
+            if config
+                .options
+                .get(config::keys::OPTION_CUSTOM_FPS)
+                .map_or(true, |fps| fps.is_empty() || fps == "30")
+            {
+                config.options.insert(
+                    config::keys::OPTION_CUSTOM_FPS.to_owned(),
+                    crate::common::RTDESK_CUSTOM_FPS.to_owned(),
+                );
+            }
+            config
+                .options
+                .insert(RTDESK_PICTURE_DEFAULT.to_owned(), "Y".to_owned());
+            config.store(&self.id);
+        }
         self.remember = !config.password.is_empty();
         self.config = config;
 
@@ -3463,15 +3485,18 @@ impl LoginConfigHandler {
                 quality
             };
             msg.custom_image_quality = quality << 8;
-            #[cfg(feature = "flutter")]
-            if let Some(custom_fps) = self.options.get("custom-fps") {
-                let mut custom_fps = custom_fps.parse().unwrap_or(30);
-                if !allow_more && custom_fps > 30 {
-                    custom_fps = 30;
-                }
-                msg.custom_fps = custom_fps;
-                *self.custom_fps.lock().unwrap() = Some(custom_fps as _);
+        }
+        // RTDESK: the frame rate goes with every quality, not only "custom", so the 60 fps
+        // default also applies with "best" (the host otherwise caps at 30).
+        #[cfg(feature = "flutter")]
+        if let Some(custom_fps) = self.options.get("custom-fps") {
+            let allow_more = !crate::using_public_server() || self.direct == Some(true);
+            let mut custom_fps = custom_fps.parse().unwrap_or(30);
+            if !allow_more && custom_fps > 30 {
+                custom_fps = 30;
             }
+            msg.custom_fps = custom_fps;
+            *self.custom_fps.lock().unwrap() = Some(custom_fps as _);
         }
         let view_only = self.get_toggle_option("view-only");
         if view_only {
@@ -3799,13 +3824,28 @@ impl LoginConfigHandler {
                 crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, evt);
             }
         }
-        if config.keyboard_mode.is_empty() {
-            if is_keyboard_mode_supported(
-                &KeyboardMode::Map,
-                get_version_number(&pi.version),
-                &pi.platform,
-            ) {
-                config.keyboard_mode = KeyboardMode::Map.to_string();
+        // RTDESK: type with the local keyboard layout (Translate mode), like AnyDesk and
+        // TeamViewer: a QWERTY keyboard writes what is printed on its keys on an AZERTY peer.
+        // Applied once per peer, so peers saved earlier with the old default (Map) switch too,
+        // and a mode chosen later in the toolbar is kept.
+        const RTDESK_KEYBOARD_DEFAULT: &str = "rtdesk-keyboard-translate";
+        let rtdesk_default = !config.options.contains_key(RTDESK_KEYBOARD_DEFAULT);
+        if rtdesk_default {
+            config
+                .options
+                .insert(RTDESK_KEYBOARD_DEFAULT.to_owned(), "Y".to_owned());
+        }
+        if config.keyboard_mode.is_empty() || rtdesk_default {
+            let version = get_version_number(&pi.version);
+            if is_keyboard_mode_supported(&KeyboardMode::Map, version, &pi.platform) {
+                // Map is not offered for Android peers: those keep Legacy below.
+                config.keyboard_mode =
+                    if is_keyboard_mode_supported(&KeyboardMode::Translate, version, &pi.platform)
+                    {
+                        KeyboardMode::Translate.to_string()
+                    } else {
+                        KeyboardMode::Map.to_string()
+                    };
             } else {
                 config.keyboard_mode = KeyboardMode::Legacy.to_string();
             }

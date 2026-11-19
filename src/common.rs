@@ -2357,7 +2357,24 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+/// RTDESK picture defaults: "best" quality and 60 fps instead of "balanced" and 30, for a picture
+/// as sharp and smooth as AnyDesk / TeamViewer. They are only defaults: custom.txt (read next) and
+/// the user's own choices in the session toolbar still win.
+pub const RTDESK_IMAGE_QUALITY: &str = "best";
+pub const RTDESK_CUSTOM_FPS: &str = "60";
+
+fn rtdesk_display_defaults() {
+    let mut defaults = config::DEFAULT_DISPLAY_SETTINGS.write().unwrap();
+    defaults
+        .entry(keys::OPTION_IMAGE_QUALITY.to_owned())
+        .or_insert_with(|| RTDESK_IMAGE_QUALITY.to_owned());
+    defaults
+        .entry(keys::OPTION_CUSTOM_FPS.to_owned())
+        .or_insert_with(|| RTDESK_CUSTOM_FPS.to_owned());
+}
+
 pub fn load_custom_client() {
+    rtdesk_display_defaults();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
