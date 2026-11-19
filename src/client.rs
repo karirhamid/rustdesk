@@ -3051,6 +3051,24 @@ impl LoginConfigHandler {
                 .insert(RTDESK_PICTURE_DEFAULT.to_owned(), "Y".to_owned());
             config.store(&self.id);
         }
+        // RTDESK: same once-per-peer move for the sharp-text default (true colour 4:4:4).
+        const RTDESK_PICTURE_SHARP: &str = "rtdesk-picture-sharp";
+        if !config.options.contains_key(RTDESK_PICTURE_SHARP) {
+            if config
+                .options
+                .get(config::keys::OPTION_I444)
+                .map_or(true, |v| v.is_empty())
+            {
+                config.options.insert(
+                    config::keys::OPTION_I444.to_owned(),
+                    crate::common::RTDESK_I444.to_owned(),
+                );
+            }
+            config
+                .options
+                .insert(RTDESK_PICTURE_SHARP.to_owned(), "Y".to_owned());
+            config.store(&self.id);
+        }
         self.remember = !config.password.is_empty();
         self.config = config;
 

@@ -2362,6 +2362,9 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 /// the user's own choices in the session toolbar still win.
 pub const RTDESK_IMAGE_QUALITY: &str = "best";
 pub const RTDESK_CUSTOM_FPS: &str = "60";
+/// Sharp text: true colour 4:4:4 (used with VP9 / AV1, which "Auto" picks for computers, see
+/// scrap Decoder::preference). Switchable in the session toolbar.
+pub const RTDESK_I444: &str = "Y";
 
 fn rtdesk_display_defaults() {
     let mut defaults = config::DEFAULT_DISPLAY_SETTINGS.write().unwrap();
@@ -2371,6 +2374,9 @@ fn rtdesk_display_defaults() {
     defaults
         .entry(keys::OPTION_CUSTOM_FPS.to_owned())
         .or_insert_with(|| RTDESK_CUSTOM_FPS.to_owned());
+    defaults
+        .entry(keys::OPTION_I444.to_owned())
+        .or_insert_with(|| RTDESK_I444.to_owned());
 }
 
 pub fn load_custom_client() {

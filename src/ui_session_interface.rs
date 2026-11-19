@@ -1849,9 +1849,20 @@ impl<T: InvokeUiSession> Interface for Session<T> {
         // Clear audit_guid when connection is established successfully
         *self.audit_guid.lock().unwrap() = String::new();
         *self.last_audit_note.lock().unwrap() = String::new();
+        // RTDESK: "Auto" codec depends on the device's platform (scrap Decoder::preference), which
+        // a first connection does not know yet: ask again once it is saved, for a phone.
+        let platform_was_unknown = self.lc.read().unwrap().load_config().info.platform.is_empty();
         // Save recent peers, then push event to flutter. So flutter can refresh peer page.
         self.lc.write().unwrap().handle_peer_info(&pi);
         self.set_peer_info(&pi);
+        if platform_was_unknown
+            && pi.platform.eq_ignore_ascii_case(crate::PLATFORM_ANDROID)
+            && !self.is_file_transfer()
+            && !self.is_port_forward()
+            && !self.is_terminal()
+        {
+            self.update_supported_decodings();
+        }
         if self.is_file_transfer() {
             self.close_success();
         } else if !self.is_port_forward() && !self.is_terminal() {

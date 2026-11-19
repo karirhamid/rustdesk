@@ -80,6 +80,13 @@ pub trait EncoderApi {
     fn is_hardware(&self) -> bool;
 
     fn disable(&self);
+
+    /// RTDESK: while on, encodes of an unchanged (still) image get a tighter quantizer range and
+    /// are never dropped; the bitrate target stays as it is. Off restores the normal settings.
+    /// Encoders without it keep their settings, so those encodes are plain repeats.
+    fn set_sharpen(&mut self, _on: bool) -> ResultType<()> {
+        Ok(())
+    }
 }
 
 pub struct Encoder {
@@ -821,7 +828,8 @@ impl Decoder {
         if id.is_empty() {
             return (PreferCodec::Auto, Chroma::I420);
         }
-        let options = PeerConfig::load(id).options;
+        let peer = PeerConfig::load(id);
+        let options = peer.options;
         let codec = options
             .get("codec-preference")
             .map_or("".to_owned(), |c| c.to_owned());
@@ -835,8 +843,14 @@ impl Decoder {
             PreferCodec::H264
         } else if codec == "h265" {
             PreferCodec::H265
-        } else {
+        } else if peer.info.platform.eq_ignore_ascii_case("android") {
             PreferCodec::Auto
+        } else {
+            // RTDESK: "Auto" asks computers for VP9: screen-tuned, sharpened while the screen
+            // is still and able to do true colour 4:4:4, it gives the sharpest text; hardware
+            // H.264/H.265 does not. Phones (Android) keep the automatic choice, their hardware
+            // encoder. A codec picked in the toolbar always wins.
+            PreferCodec::VP9
         };
         let chroma = if options.get("i444") == Some(&"Y".to_string()) {
             Chroma::I444

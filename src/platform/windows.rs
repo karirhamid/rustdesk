@@ -1056,8 +1056,11 @@ pub fn try_change_desktop() -> bool {
     return false;
 }
 
+// RTDESK: off unless enabled in Settings. Like AnyDesk, the service then always shows the
+// physical screen: while someone is connected over RDP that is the Windows sign-in page, and
+// signing in there takes the session back from RDP (Windows asks the RDP user first).
 fn share_rdp() -> BOOL {
-    if get_reg("share_rdp") != "false" {
+    if get_reg("share_rdp") == "true" {
         TRUE
     } else {
         FALSE

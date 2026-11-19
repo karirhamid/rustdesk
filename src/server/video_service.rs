@@ -64,6 +64,10 @@ use std::{
 
 pub const OPTION_REFRESH: &'static str = "refresh";
 
+// RTDESK: still-screen sharpening for software encoders (VP8 / VP9 / AV1).
+const SHARPEN_FRAMES: u32 = 4; // extra encodes of the last image once the screen is still
+const SHARPEN_AFTER_STILL: Duration = Duration::from_millis(120);
+
 #[cfg(windows)]
 const DXGI_RECOVERY_LIMIT: usize = 3;
 #[cfg(windows)]
@@ -725,6 +729,9 @@ fn run(vs: VideoService) -> ResultType<()> {
     let mut mid_data = Vec::new();
     let mut repeat_encode_counter = 0;
     let repeat_encode_max = 10;
+    // RTDESK: still-screen sharpening, see the WouldBlock branch below.
+    let mut sharpen_left = 0u32;
+    let mut last_new_frame = Instant::now();
     let mut encode_fail_counter = 0;
     let mut first_frame = true;
     let capture_width = c.width;
@@ -799,6 +806,8 @@ fn run(vs: VideoService) -> ResultType<()> {
         let res = match c.frame(spf) {
             Ok(frame) => {
                 repeat_encode_counter = 0;
+                sharpen_left = SHARPEN_FRAMES;
+                last_new_frame = Instant::now();
                 if frame.valid() {
                     let screenshot_key = (vs.source, display_idx);
                     let screenshot = SCREENSHOTS.lock().unwrap().remove(&screenshot_key);
@@ -927,6 +936,36 @@ fn run(vs: VideoService) -> ResultType<()> {
                         frame_controller.set_send(now, send_conn_ids);
                         send_counter += 1;
                     }
+                }
+                // RTDESK: a software encoder sends a changed area once, at the quality the
+                // bitrate allows at that moment, and nothing more while the screen stays
+                // still, so text after a scroll or a new window stayed soft. Worse, a frame
+                // the encoder dropped (over budget) was never sent: the viewer kept an old
+                // picture until something else changed. Once the screen has been still for a
+                // moment, encode the last image again a few times with set_sharpen: the
+                // picture sharpens over a fraction of a second and always arrives.
+                if sharpen_left > 0
+                    && yuv.len() > 0
+                    && encoder.latency_free()
+                    && !encoder.is_hardware()
+                    && last_new_frame.elapsed() >= SHARPEN_AFTER_STILL
+                {
+                    sharpen_left -= 1;
+                    allow_err!(encoder.set_sharpen(true));
+                    let sharpened = handle_one_frame(
+                        display_idx,
+                        &sp,
+                        EncodeInput::YUV(&yuv),
+                        ms,
+                        &mut encoder,
+                        recorder.clone(),
+                        &mut encode_fail_counter,
+                        &mut first_frame,
+                        capture_width,
+                        capture_height,
+                    );
+                    allow_err!(encoder.set_sharpen(false));
+                    frame_controller.set_send(now, sharpened?);
                 }
             }
             Err(err) => {
