@@ -707,7 +707,9 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
             .iter()
             .map(|e| e.sid)
             .collect();
-        if !sids.contains(&session_id) || !is_share_rdp() {
+        // RTDESK: without RDP sharing the service follows the physical screen, except for a session
+        // a viewer picked in the session dialog (kept until that session ends).
+        if !sids.contains(&session_id) || (!is_share_rdp() && stored_usid != Some(session_id)) {
             let current_active_session = unsafe { get_current_session(share_rdp()) };
             if session_id != current_active_session {
                 session_id = current_active_session;
@@ -1104,6 +1106,33 @@ pub fn rtdesk_allow_rdp_window(peer_session_id: Option<u32>, server_session_id: 
     }
     let peer_user = get_session_username(peer);
     !peer_user.is_empty() && peer_user.eq_ignore_ascii_case(&server_user)
+}
+
+// RTDESK: true while the input desktop is Windows' secure desktop ("Winlogon": the sign-in page,
+// the lock screen and UAC prompts). Characters typed in translate mode are sent there as key
+// presses of this PC's own layout: Unicode injection gives wrong characters on it.
+pub fn is_secure_input_desktop() -> bool {
+    let _ = try_change_desktop();
+    unsafe {
+        let desk = GetThreadDesktop(winapi::um::processthreadsapi::GetCurrentThreadId());
+        if desk.is_null() {
+            return false;
+        }
+        let mut name = [0u16; 64];
+        let mut needed: DWORD = 0;
+        if GetUserObjectInformationW(
+            desk as HANDLE,
+            UOI_NAME as _,
+            name.as_mut_ptr() as _,
+            (name.len() * 2) as DWORD,
+            &mut needed,
+        ) == FALSE
+        {
+            return false;
+        }
+        let len = name.iter().position(|&c| c == 0).unwrap_or(name.len());
+        String::from_utf16_lossy(&name[..len]).eq_ignore_ascii_case("winlogon")
+    }
 }
 
 pub fn get_current_process_session_id() -> Option<u32> {

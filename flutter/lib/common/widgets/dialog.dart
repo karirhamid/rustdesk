@@ -2409,6 +2409,21 @@ void enter2FaDialog(
 }
 
 // This dialog should not be dismissed, otherwise it will be black screen, have not reproduced this.
+// RTDESK: "Console" is the PC's own screen (the Windows sign-in page when nobody is signed in on
+// it), "RDP: user" an open RDP session.
+String _windowsSessionLabel(dynamic raw) {
+  final name = (raw ?? '').toString();
+  String withUser(String label, String prefix) {
+    final user = name.substring(prefix.length).trim();
+    return user.isEmpty ? label : '$label\u00A0: $user';
+  }
+
+  if (name == 'Console') return translate('PC screen (Windows sign-in page)');
+  if (name.startsWith('Console:')) return withUser(translate('PC screen'), 'Console:');
+  if (name.startsWith('RDP:')) return withUser(translate('RDP session'), 'RDP:');
+  return name;
+}
+
 void showWindowsSessionsDialog(
     String type,
     String title,
@@ -2427,7 +2442,7 @@ void showWindowsSessionsDialog(
   List<String> names = [];
   for (var session in sessionsList) {
     sids.add(session['sid']);
-    names.add(session['name']);
+    names.add(_windowsSessionLabel(session['name']));
   }
   String selectedUserValue = sids.first;
   dialogManager.dismissAll();

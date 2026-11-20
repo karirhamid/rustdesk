@@ -2268,8 +2268,9 @@ impl Connection {
     ) {
         let sessions = crate::platform::get_available_sessions(true);
         if let Some(current_sid) = crate::platform::get_current_process_session_id() {
+            // RTDESK: offered in console mode too, so the viewer can choose between the PC's own
+            // screen (listed first, the default) and an open RDP session.
             if crate::platform::is_installed()
-                && crate::platform::is_share_rdp()
                 && raii::AuthedConnID::non_port_forward_conn_count() == 1
                 && sessions.len() > 1
                 && sessions.iter().any(|e| e.sid == current_sid)
@@ -3970,7 +3971,6 @@ impl Connection {
                         {
                             let sessions = crate::platform::get_available_sessions(false);
                             if crate::platform::is_installed()
-                                && crate::platform::is_share_rdp()
                                 && raii::AuthedConnID::non_port_forward_conn_count() == 1
                                 && sessions.len() > 1
                                 && current_process_sid != sid

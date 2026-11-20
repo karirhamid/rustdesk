@@ -2332,11 +2332,30 @@ fn translate_keyboard_mode(evt: &KeyEvent) {
                         }
                     }
                 }
+                // RTDESK: on the sign-in page / lock screen, type with this PC's own layout.
+                #[cfg(target_os = "windows")]
+                let secure_desktop =
+                    !simulate_win_hot_key && crate::platform::windows::is_secure_input_desktop();
+                #[cfg(target_os = "windows")]
+                let caps_on = secure_desktop && en.get_key_state(Key::CapsLock);
                 for chr in seq.chars() {
                     // char in rust is 4 bytes.
                     // But for this case, char comes from keyboard. We only need 2 bytes.
                     #[cfg(target_os = "windows")]
                     if simulate_win_hot_key {
+                        rdev::simulate_char(chr, true).ok();
+                    } else if secure_desktop {
+                        // Caps Lock (synced with the viewer) would flip the case of a letter typed
+                        // with its key, so ask for the opposite case.
+                        let chr = if caps_on && chr.is_alphabetic() {
+                            if chr.is_uppercase() {
+                                chr.to_lowercase().next().unwrap_or(chr)
+                            } else {
+                                chr.to_uppercase().next().unwrap_or(chr)
+                            }
+                        } else {
+                            chr
+                        };
                         rdev::simulate_char(chr, true).ok();
                     } else {
                         rdev::simulate_unicode(chr as _).ok();
