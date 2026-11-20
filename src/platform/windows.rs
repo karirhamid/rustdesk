@@ -1081,6 +1081,31 @@ pub fn set_share_rdp(enable: bool) {
     run_cmds(cmd, false, "share_rdp").ok();
 }
 
+// RTDESK: with RDP sharing off the server runs on the physical screen, so an RTDESK window opened
+// in an RDP session was refused by the main IPC and never showed the password ("Generating...").
+// Let it in when the physical screen is the sign-in page (no user) or belongs to the same Windows
+// user, so another user signed in over RDP can't take over a desktop that is in use.
+pub fn rtdesk_allow_rdp_window(peer_session_id: Option<u32>, server_session_id: Option<u32>) -> bool {
+    if is_share_rdp() {
+        return false;
+    }
+    let (Some(peer), Some(server)) = (peer_session_id, server_session_id) else {
+        return false;
+    };
+    if peer == server || peer == 0 {
+        return false;
+    }
+    if unsafe { get_current_session(FALSE) } != server {
+        return false;
+    }
+    let server_user = get_session_username(server);
+    if server_user.is_empty() {
+        return true;
+    }
+    let peer_user = get_session_username(peer);
+    !peer_user.is_empty() && peer_user.eq_ignore_ascii_case(&server_user)
+}
+
 pub fn get_current_process_session_id() -> Option<u32> {
     get_session_id_of_process(unsafe { GetCurrentProcessId() })
 }

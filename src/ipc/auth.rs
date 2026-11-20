@@ -628,7 +628,9 @@ pub(crate) fn authorize_windows_main_ipc_connection(stream: &Connection, postfix
         peer_is_system,
         peer_is_elevated,
     ) = stream.server_authorization_status();
-    if !authorized {
+    if !authorized
+        && !crate::platform::windows::rtdesk_allow_rdp_window(peer_session_id, server_session_id)
+    {
         log_rejected_windows_ipc_connection(
             postfix,
             peer_pid,
