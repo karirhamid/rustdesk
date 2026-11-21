@@ -3846,7 +3846,9 @@ impl LoginConfigHandler {
         // TeamViewer: a QWERTY keyboard writes what is printed on its keys on an AZERTY peer.
         // Applied once per peer, so peers saved earlier with the old default (Map) switch too,
         // and a mode chosen later in the toolbar is kept.
-        const RTDESK_KEYBOARD_DEFAULT: &str = "rtdesk-keyboard-translate";
+        // "-2" (2026-11-21): applied once more, because Macs without Input Monitoring had saved
+        // Map on their peers (the Flutter input source only offers Map).
+        const RTDESK_KEYBOARD_DEFAULT: &str = "rtdesk-keyboard-translate-2";
         let rtdesk_default = !config.options.contains_key(RTDESK_KEYBOARD_DEFAULT);
         if rtdesk_default {
             config

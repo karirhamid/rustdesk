@@ -77,8 +77,8 @@ use windows::Win32::{
         WinLocalSystemSid, TOKEN_QUERY as WIN_TOKEN_QUERY, TOKEN_USER,
     },
     System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
-        TH32CS_SNAPPROCESS,
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, Thread32First, Thread32Next,
+        PROCESSENTRY32W, TH32CS_SNAPPROCESS, TH32CS_SNAPTHREAD, THREADENTRY32,
     },
     System::Threading::{
         OpenProcess as WinOpenProcess, OpenProcessToken as WinOpenProcessToken,
@@ -1132,6 +1132,98 @@ pub fn is_secure_input_desktop() -> bool {
         }
         let len = name.iter().position(|&c| c == 0).unwrap_or(name.len());
         String::from_utf16_lossy(&name[..len]).eq_ignore_ascii_case("winlogon")
+    }
+}
+
+// RTDESK: the keyboard layout to type with on the secure desktop. The foreground window's when
+// there is one. On the sign-in page there is often none, and rdev then uses this process's own
+// layout (the system default, often English US), so a character came out as the key at the same
+// place on the PC's layout ("@" as '"' on a Dutch PC). Then the sign-in screen's (LogonUI in this
+// session) is used.
+pub fn secure_desktop_keyboard_layout() -> Option<HKL> {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if !hwnd.is_null() {
+            let tid = GetWindowThreadProcessId(hwnd, null_mut());
+            if tid != 0 {
+                let hkl = GetKeyboardLayout(tid);
+                if !hkl.is_null() {
+                    return Some(hkl);
+                }
+            }
+        }
+    }
+    let session = get_current_process_session_id()?;
+    let pids: Vec<u32> = get_pids("logonui.exe")
+        .ok()?
+        .into_iter()
+        .filter(|pid| get_session_id_of_process(*pid) == Some(session))
+        .collect();
+    if pids.is_empty() {
+        return None;
+    }
+    let mut found = None;
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0).ok()?;
+        let mut entry: THREADENTRY32 = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+        if Thread32First(snapshot, &mut entry).is_ok() {
+            loop {
+                if pids.contains(&entry.th32OwnerProcessID) {
+                    let hkl = GetKeyboardLayout(entry.th32ThreadID);
+                    if !hkl.is_null() {
+                        found = Some(hkl);
+                        break;
+                    }
+                }
+                if Thread32Next(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = WinCloseHandle(snapshot);
+    }
+    log::debug!("secure desktop without foreground window, sign-in layout {:?}", found);
+    found
+}
+
+// RTDESK: types `chr` with the key (plus Shift / Ctrl+Alt) that gives it in `layout`, like
+// rdev::simulate_char does with the foreground window's layout. A character the layout has no key
+// for is sent as Unicode.
+pub fn type_char_with_layout(chr: char, layout: Option<HKL>) {
+    let Some(layout) = layout else {
+        rdev::simulate_char(chr, true).ok();
+        return;
+    };
+    let mut buf = [0u16; 2];
+    let units = chr.encode_utf16(&mut buf);
+    if units.len() != 1 {
+        for unit in units.iter() {
+            rdev::simulate_unicode(*unit).ok();
+        }
+        return;
+    }
+    let res = unsafe { VkKeyScanExW(units[0], layout) } as u16;
+    if res == 0xFFFF {
+        rdev::simulate_unicode(units[0]).ok();
+        return;
+    }
+    let vk = (res & 0xFF) as u32;
+    let shift_state = res >> 8;
+    // Shift, Ctrl, Alt (Ctrl+Alt is AltGr), sent as scancodes like rdev does.
+    const MODIFIERS: [u32; 3] = [0x2A, 0x1D, 0x38];
+    for (i, scan) in MODIFIERS.iter().enumerate() {
+        if shift_state & (1 << i) != 0 {
+            rdev::simulate_code(None, Some(*scan), true).ok();
+        }
+    }
+    let scan = unsafe { MapVirtualKeyExW(vk, MAPVK_VK_TO_VSC, layout) };
+    rdev::simulate_code(Some(vk as u16), Some(scan), true).ok();
+    rdev::simulate_code(Some(vk as u16), Some(scan), false).ok();
+    for (i, scan) in MODIFIERS.iter().enumerate().rev() {
+        if shift_state & (1 << i) != 0 {
+            rdev::simulate_code(None, Some(*scan), false).ok();
+        }
     }
 }
 

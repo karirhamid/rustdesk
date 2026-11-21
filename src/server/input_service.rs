@@ -2338,6 +2338,12 @@ fn translate_keyboard_mode(evt: &KeyEvent) {
                     !simulate_win_hot_key && crate::platform::windows::is_secure_input_desktop();
                 #[cfg(target_os = "windows")]
                 let caps_on = secure_desktop && en.get_key_state(Key::CapsLock);
+                #[cfg(target_os = "windows")]
+                let secure_layout = if secure_desktop {
+                    crate::platform::windows::secure_desktop_keyboard_layout()
+                } else {
+                    None
+                };
                 for chr in seq.chars() {
                     // char in rust is 4 bytes.
                     // But for this case, char comes from keyboard. We only need 2 bytes.
@@ -2356,7 +2362,7 @@ fn translate_keyboard_mode(evt: &KeyEvent) {
                         } else {
                             chr
                         };
-                        rdev::simulate_char(chr, true).ok();
+                        crate::platform::windows::type_char_with_layout(chr, secure_layout);
                     } else {
                         rdev::simulate_unicode(chr as _).ok();
                     }

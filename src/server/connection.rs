@@ -506,6 +506,123 @@ const SEND_TIMEOUT_VIDEO: u64 = 12_000;
 const SEND_TIMEOUT_OTHER: u64 = SEND_TIMEOUT_VIDEO * 10;
 const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
+// RTDESK: the recent sessions (the one-time password a viewer logged in with) are kept across a
+// restart of this server by the Windows service. When someone signs in on the PC's own screen,
+// the service restarts the server in the new Windows session; the viewer's automatic reconnect
+// was then refused as "wrong password" (the one-time password was used, the new server has a new
+// one). Saved encrypted every 2 s next to the config (SYSTEM only), read once at start.
+const RTDESK_SESSIONS_FILE: &str = "rtdesk-sessions.json";
+// Taken back only if the previous server was alive this recently (seconds).
+const RTDESK_SESSIONS_MAX_AGE: u64 = 120;
+
+fn rtdesk_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn rtdesk_restore_sessions() {
+    let path = Config::path(RTDESK_SESSIONS_FILE);
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    std::fs::remove_file(&path).ok();
+    let Ok(saved) = serde_json::from_str::<Value>(&text) else {
+        return;
+    };
+    let alive_at = saved["alive_at"].as_u64().unwrap_or(0);
+    if rtdesk_unix_secs().saturating_sub(alive_at) > RTDESK_SESSIONS_MAX_AGE {
+        return;
+    }
+    // Starts counting SESSION_TIMEOUT from now + SESSION_TIMEOUT (elapsed() is 0 until then): the
+    // viewer has a minute to come back while Windows opens the session.
+    let start = Instant::now()
+        .checked_add(SESSION_TIMEOUT)
+        .unwrap_or_else(Instant::now);
+    let mut restored = 0;
+    let mut lock = SESSIONS.lock().unwrap();
+    for s in saved["sessions"].as_array().cloned().unwrap_or_default() {
+        let (Some(peer_id), Some(name), Some(session_id)) = (
+            s["peer_id"].as_str(),
+            s["name"].as_str(),
+            s["session_id"].as_u64(),
+        ) else {
+            continue;
+        };
+        let (plain, decrypted, _) =
+            password::decrypt_str_or_original(s["password"].as_str().unwrap_or_default(), "00");
+        let random_password = if decrypted { plain } else { String::new() };
+        let tfa = s["tfa"].as_bool().unwrap_or(false);
+        if random_password.is_empty() && !tfa {
+            continue;
+        }
+        lock.insert(
+            SessionKey {
+                peer_id: peer_id.to_owned(),
+                name: name.to_owned(),
+                session_id,
+            },
+            Session {
+                last_recv_time: Arc::new(Mutex::new(start)),
+                random_password,
+                tfa,
+            },
+        );
+        restored += 1;
+    }
+    if restored > 0 {
+        log::info!("RTDESK: {} recent session(s) kept across the server restart", restored);
+    }
+}
+
+fn rtdesk_save_sessions(has_file: &mut bool) {
+    let list: Vec<Value> = SESSIONS
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(_, s)| {
+            (!s.random_password.is_empty() || s.tfa)
+                && s.last_recv_time.lock().unwrap().elapsed() < SESSION_TIMEOUT
+        })
+        .map(|(k, s)| {
+            json!({
+                "peer_id": k.peer_id,
+                "name": k.name,
+                "session_id": k.session_id,
+                "password": password::encrypt_str_or_original(&s.random_password, "00", 128),
+                "tfa": s.tfa,
+            })
+        })
+        .collect();
+    let path = Config::path(RTDESK_SESSIONS_FILE);
+    if list.is_empty() {
+        if *has_file {
+            std::fs::remove_file(&path).ok();
+            *has_file = false;
+        }
+        return;
+    }
+    let text = json!({ "alive_at": rtdesk_unix_secs(), "sessions": list }).to_string();
+    // Written whole then renamed, so a restart never reads half a file.
+    let tmp = path.with_extension("tmp");
+    if std::fs::write(&tmp, text).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
+        *has_file = true;
+    }
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn rtdesk_start_session_keeper() {
+    rtdesk_restore_sessions();
+    std::thread::spawn(|| {
+        let mut has_file = false;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            rtdesk_save_sessions(&mut has_file);
+        }
+    });
+}
+
 /// Whether the DRM backend can serve a Wayland login screen here.
 ///
 /// A cold cache probes off-thread; admission still requires a definitive `Available` verdict.

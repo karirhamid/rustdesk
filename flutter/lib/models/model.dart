@@ -1506,17 +1506,37 @@ class FfiModel with ChangeNotifier {
   }
 
   checkDesktopKeyboardMode() async {
+    // RTDESK: Translate mode replaced only because of the Flutter input source (a Mac without
+    // Input Monitoring) is marked on the peer, and comes back with input source 1.
+    const kRtdeskForcedMap = 'rtdesk-keyboard-forced-map';
     if (isInputSourceFlutter) {
       // Local side, flutter keyboard input source
       // Currently only map mode is supported, legacy mode is used for compatibility.
       for (final mode in [kKeyMapMode, kKeyLegacyMode]) {
         if (bind.sessionIsKeyboardModeSupported(
             sessionId: sessionId, mode: mode)) {
+          final curMode = await bind.sessionGetKeyboardMode(sessionId: sessionId);
+          if (curMode == kKeyTranslateMode) {
+            await bind.sessionPeerOption(
+                sessionId: sessionId, name: kRtdeskForcedMap, value: 'Y');
+          }
           await bind.sessionSetKeyboardMode(sessionId: sessionId, value: mode);
           break;
         }
       }
     } else {
+      if (await bind.sessionGetOption(
+              sessionId: sessionId, arg: kRtdeskForcedMap) ==
+          'Y') {
+        await bind.sessionPeerOption(
+            sessionId: sessionId, name: kRtdeskForcedMap, value: '');
+        if (bind.sessionIsKeyboardModeSupported(
+            sessionId: sessionId, mode: kKeyTranslateMode)) {
+          await bind.sessionSetKeyboardMode(
+              sessionId: sessionId, value: kKeyTranslateMode);
+          return;
+        }
+      }
       final curMode = await bind.sessionGetKeyboardMode(sessionId: sessionId);
       if (curMode != null) {
         if (bind.sessionIsKeyboardModeSupported(

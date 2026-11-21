@@ -1557,6 +1557,9 @@ pub mod input_source {
     pub const CONFIG_INPUT_SOURCE_2_TIP: &str = "input_source_2_tip";
 
     pub const CONFIG_INPUT_SOURCE_DEFAULT: &str = CONFIG_INPUT_SOURCE_1;
+    // RTDESK: "Y" while input source 2 is forced by a missing Input Monitoring permission.
+    #[cfg(target_os = "macos")]
+    const RTDESK_INPUT_SOURCE_FORCED: &str = "rtdesk-input-source-forced";
 
     pub fn init_input_source() {
         #[cfg(target_os = "linux")]
@@ -1572,7 +1575,24 @@ pub mod input_source {
                 CONFIG_OPTION_INPUT_SOURCE.to_string(),
                 CONFIG_INPUT_SOURCE_2.to_string(),
             );
+            // RTDESK: remember the switch was forced, to undo it once the permission is given.
+            set_local_option(RTDESK_INPUT_SOURCE_FORCED.to_string(), "Y".to_string());
             return;
+        }
+        // RTDESK: Input Monitoring is allowed: go back to input source 1 if source 2 was forced
+        // by a missing permission (or set before RTDESK tracked it). Source 2 only offers Map
+        // mode, which types by key position: "@" came out as '"' on a Dutch PC. "N" afterwards,
+        // so a source chosen later in the settings is kept.
+        #[cfg(target_os = "macos")]
+        if get_local_option(RTDESK_INPUT_SOURCE_FORCED.to_string()) != "N" {
+            if get_local_option(CONFIG_OPTION_INPUT_SOURCE.to_string()) == CONFIG_INPUT_SOURCE_2 {
+                log::info!("RTDESK: Input Monitoring allowed, back to input source 1");
+                set_local_option(
+                    CONFIG_OPTION_INPUT_SOURCE.to_string(),
+                    CONFIG_INPUT_SOURCE_1.to_string(),
+                );
+            }
+            set_local_option(RTDESK_INPUT_SOURCE_FORCED.to_string(), "N".to_string());
         }
         let cur_input_source = get_cur_session_input_source();
         if cur_input_source == CONFIG_INPUT_SOURCE_1 {

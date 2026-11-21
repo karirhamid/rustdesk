@@ -671,6 +671,10 @@ pub async fn start_server(is_server: bool, no_server: bool) {
 
     if is_server {
         crate::common::set_server_running(true);
+        // RTDESK: a viewer connected when the service restarts this server (someone signed in
+        // on the PC's own screen) gets back in on the same password.
+        #[cfg(windows)]
+        rtdesk_start_session_keeper();
         std::thread::spawn(move || {
             if let Err(err) = crate::ipc::start("") {
                 log::error!("Failed to start ipc: {}", err);
