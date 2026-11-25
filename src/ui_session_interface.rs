@@ -1752,6 +1752,9 @@ pub trait InvokeUiSession: Send + Sync + Clone + 'static + Sized + Default {
     #[cfg(feature = "flutter")]
     fn is_multi_ui_session(&self) -> bool;
     fn update_record_status(&self, start: bool);
+    // RTDESK: a recording stopped. `files` is how many files were kept (0: nothing was saved);
+    // `path` is the last one, `dir` its folder.
+    fn rtdesk_record_saved(&self, _path: &str, _dir: &str, _files: usize) {}
     fn update_empty_dirs(&self, _res: ReadEmptyDirsResponse) {}
     fn printer_request(&self, id: i32, path: String);
     fn handle_screenshot_resp(&self, sid: String, msg: String);

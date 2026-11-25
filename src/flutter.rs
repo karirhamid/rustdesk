@@ -1092,6 +1092,15 @@ impl InvokeUiSession for FlutterHandler {
         self.push_event("record_status", &[("start", &start.to_string())], &[]);
     }
 
+    fn rtdesk_record_saved(&self, path: &str, dir: &str, files: usize) {
+        let files = files.to_string();
+        self.push_event(
+            "rtdesk_record_saved",
+            &[("path", path), ("dir", dir), ("files", files.as_str())],
+            &[],
+        );
+    }
+
     fn printer_request(&self, id: i32, path: String) {
         self.push_event(
             "printer_request",

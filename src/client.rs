@@ -78,7 +78,7 @@ use base::{
 pub use helper::*;
 use scrap::{
     codec::Decoder,
-    record::{Recorder, RecorderContext},
+    record::{RecordState, Recorder, RecorderContext},
     CodecFormat, ImageFormat, ImageRgb, ImageTexture,
 };
 
@@ -2827,7 +2827,14 @@ impl VideoHandler {
     }
 
     /// Start or stop screen record.
-    pub fn record_screen(&mut self, start: bool, id: String, display_idx: usize, camera: bool) {
+    pub fn record_screen(
+        &mut self,
+        start: bool,
+        id: String,
+        display_idx: usize,
+        camera: bool,
+        tx: Option<std::sync::mpsc::Sender<RecordState>>,
+    ) {
         self.record = false;
         if start {
             self.recorder = Recorder::new(RecorderContext {
@@ -2836,7 +2843,7 @@ impl VideoHandler {
                 dir: crate::ui_interface::video_save_directory(false),
                 display_idx,
                 camera,
-                tx: None,
+                tx,
             })
             .map_or(Default::default(), |r| Arc::new(Mutex::new(Some(r))));
         } else {
@@ -2844,6 +2851,55 @@ impl VideoHandler {
         }
 
         self.record = start;
+    }
+
+    pub fn is_recording(&self) -> bool {
+        self.record
+    }
+}
+
+// RTDESK: follows the files of a recording, so the viewer can say where it was saved once it
+// stops (nothing was shown before). A recording starts a new file when the remote screen size
+// changes; a file shorter than one second is removed by the recorder.
+#[derive(Default)]
+struct RtdeskRecordFiles {
+    current: String,
+    saved: Vec<String>,
+}
+
+impl RtdeskRecordFiles {
+    fn drain(&mut self, rx: &std::sync::mpsc::Receiver<RecordState>) {
+        for state in rx.try_iter() {
+            match state {
+                RecordState::NewFile(path) => self.current = path,
+                RecordState::WriteTail => {
+                    if !self.current.is_empty() {
+                        self.saved.push(std::mem::take(&mut self.current));
+                    }
+                }
+                RecordState::RemoveFile => self.current.clear(),
+                RecordState::NewFrame => {}
+            }
+        }
+    }
+
+    // Called after the recorder was dropped (stop): the drop sends its last state synchronously.
+    fn report<T: InvokeUiSession>(&mut self, rx: &std::sync::mpsc::Receiver<RecordState>, session: &Session<T>) {
+        self.drain(rx);
+        let saved = std::mem::take(&mut self.saved);
+        self.current.clear();
+        let (path, dir) = match saved.last() {
+            Some(path) => (
+                path.clone(),
+                std::path::Path::new(path)
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+            ),
+            None => (String::new(), crate::ui_interface::video_save_directory(false)),
+        };
+        log::info!("RTDESK: recording stopped, saved files: {}", saved.len());
+        session.rtdesk_record_saved(&path, &dir, saved.len());
     }
 }
 
@@ -4139,8 +4195,11 @@ pub fn start_video_thread<F, T>(
         let mut count = 0;
         let mut duration = std::time::Duration::ZERO;
         let mut skip_beginning = 0;
+        let (record_tx, record_rx) = std::sync::mpsc::channel::<RecordState>();
+        let mut record_files = RtdeskRecordFiles::default();
         loop {
             if let Ok(data) = video_receiver.recv() {
+                record_files.drain(&record_rx);
                 match data {
                     MediaData::VideoFrame(_) | MediaData::VideoQueue => {
                         let vf = match data {
@@ -4172,7 +4231,13 @@ pub fn start_video_thread<F, T>(
                             let record_permission = session.lc.read().unwrap().record_permission;
                             let id = session.lc.read().unwrap().id.clone();
                             if record_state && record_permission {
-                                handler.record_screen(true, id, display, is_view_camera);
+                                handler.record_screen(
+                                    true,
+                                    id,
+                                    display,
+                                    is_view_camera,
+                                    Some(record_tx.clone()),
+                                );
                             }
                             video_handler = Some(handler);
                         }
@@ -4253,7 +4318,17 @@ pub fn start_video_thread<F, T>(
                     MediaData::RecordScreen(start) => {
                         let id = session.lc.read().unwrap().id.clone();
                         if let Some(handler) = video_handler.as_mut() {
-                            handler.record_screen(start, id, display, is_view_camera);
+                            let was_recording = handler.is_recording();
+                            handler.record_screen(
+                                start,
+                                id,
+                                display,
+                                is_view_camera,
+                                Some(record_tx.clone()),
+                            );
+                            if was_recording && !start {
+                                record_files.report(&record_rx, &session);
+                            }
                         }
                     }
                     _ => {}

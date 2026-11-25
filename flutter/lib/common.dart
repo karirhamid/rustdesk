@@ -1448,6 +1448,57 @@ void msgBoxCommon(OverlayDialogManager dialogManager, String title,
       ));
 }
 
+// RTDESK: shown when a screen recording stops: where the video was saved, with a button that
+// opens the folder; or that nothing was saved (shorter than one second).
+void showRtdeskRecordSavedDialog(
+    OverlayDialogManager dialogManager, String path, String dir, int files) {
+  final saved = files > 0 && path.isNotEmpty;
+  dialogManager.show((setState, close, context) {
+    openFolder() {
+      close();
+      if (dir.isNotEmpty) launchUrl(Uri.file(dir));
+    }
+
+    return CustomAlertDialog(
+      title: Text(translate('Recording'), style: TextStyle(fontSize: 21)),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 480),
+        child: SelectionArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(translate(saved
+                  ? 'rtdesk-record-saved-tip'
+                  : 'rtdesk-record-not-saved-tip')),
+              if (saved && files > 1)
+                Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(translate('rtdesk-record-several-files-tip')),
+                ),
+              if (saved || dir.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.only(top: 10),
+                  child: Text(saved ? path : dir,
+                      style: TextStyle(
+                          fontFamily: 'JetBrainsMono', fontSize: 12.5)),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        if (dir.isNotEmpty)
+          dialogButton('rtdesk-open-folder',
+              onPressed: openFolder, isOutline: true),
+        dialogButton('OK', onPressed: close),
+      ],
+      onSubmit: close,
+      onCancel: close,
+    );
+  });
+}
+
 Color str2color(String str, [alpha = 0xFF]) {
   var hash = 160 << 16 + 114 << 8 + 91;
   for (var i = 0; i < str.length; i += 1) {

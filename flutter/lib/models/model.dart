@@ -462,6 +462,15 @@ class FfiModel with ChangeNotifier {
             isMobile) {
           parent.target?.recordingModel.updateStatus(evt['start'] == 'true');
         }
+      } else if (name == "rtdesk_record_saved") {
+        final dialogManager = parent.target?.dialogManager;
+        if (dialogManager != null) {
+          showRtdeskRecordSavedDialog(
+              dialogManager,
+              (evt['path'] ?? '').toString(),
+              (evt['dir'] ?? '').toString(),
+              int.tryParse((evt['files'] ?? '0').toString()) ?? 0);
+        }
       } else if (name == "printer_request") {
         _handlePrinterRequest(evt, sessionId, peerId);
       } else if (name == 'screenshot') {

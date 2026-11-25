@@ -784,5 +784,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("PC screen", "Écran du PC"),
         ("PC screen (Windows sign-in page)", "Écran du PC (page de connexion Windows)"),
         ("RDP session", "Session RDP"),
+        ("rtdesk-record-saved-tip", "La vidéo a été enregistrée ici :"),
+        ("rtdesk-record-several-files-tip", "La taille de l'écran distant a changé pendant l'enregistrement : la vidéo est découpée en plusieurs fichiers dans ce dossier. Voici le dernier."),
+        ("rtdesk-record-not-saved-tip", "Aucune vidéo n'a été enregistrée : l'enregistrement a duré moins d'une seconde, ou le dossier d'enregistrement n'est pas accessible. Dossier :"),
+        ("rtdesk-open-folder", "Ouvrir le dossier"),
     ].iter().cloned().collect();
 }
