@@ -4,8 +4,10 @@ import 'dart:ui' as ui;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
+import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/input_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -139,7 +141,14 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _RelativeMouseModeHint(tabController: tabController),
-            const AddButton(),
+            // RTDESK: "+" asks for an ID here and opens it as a new tab of this window, so the
+            // current session stays in its tab (it used to bring the main window forward, which
+            // on a Mac in full screen hid the session).
+            ActionIcon(
+                message: 'New Connection',
+                icon: IconFont.add,
+                onTap: _rtdeskShowNewConnection,
+                isClose: false),
           ],
         ),
         selectedBorderColor: MyTheme.accent,
@@ -239,6 +248,65 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
               enableResizeEdges: subWindowManagerEnableResizeEdges,
               windowId: stateGlobal.windowId,
             ));
+  }
+
+  // RTDESK: the "+" of the tab bar. The new session opens as a tab next to the current one.
+  void _rtdeskShowNewConnection() {
+    final idController = IDTextEditingController();
+    final error = ''.obs;
+    showDialog(
+      context: context,
+      builder: (context) {
+        Future<void> submit() async {
+          final id = trimID(idController.text);
+          if (id.isEmpty) {
+            error.value = translate('rtdesk-enter-id-tip');
+            return;
+          }
+          Navigator.of(context).pop();
+          await _rtdeskOpenInNewTab(id);
+        }
+
+        return CustomAlertDialog(
+          title: Text(translate('New Connection')),
+          content: Obx(() => TextField(
+                controller: idController,
+                autofocus: true,
+                inputFormatters: [IDTextInputFormatter()],
+                style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 18),
+                decoration: InputDecoration(
+                  labelText: translate('Remote ID'),
+                  errorText: error.value.isEmpty ? null : error.value,
+                ),
+                onChanged: (_) => error.value = '',
+                onSubmitted: (_) => submit(),
+              )),
+          actions: [
+            dialogButton('Cancel',
+                onPressed: () => Navigator.of(context).pop(), isOutline: true),
+            dialogButton('Connect', onPressed: submit),
+          ],
+          onSubmit: submit,
+          onCancel: () => Navigator.of(context).pop(),
+        );
+      },
+    );
+  }
+
+  Future<void> _rtdeskOpenInNewTab(String input) async {
+    var id = trimID(formatID(input));
+    final oldId = id;
+    id = await bind.mainHandleRelayId(id: id);
+    final forceRelay = id != oldId;
+    // One tab per device: an ID that is already open is shown instead.
+    if (tabController.jumpToByKey(id)) {
+      showToast(translate('rtdesk-already-open-tip'));
+      return;
+    }
+    await _remoteMethodHandler(
+        MethodCall(kWindowEventNewRemoteDesktop,
+            jsonEncode({'id': id, 'forceRelay': forceRelay})),
+        windowId());
   }
 
   // Note: Some dup code to ../widgets/remote_toolbar

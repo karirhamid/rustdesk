@@ -788,5 +788,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("rtdesk-record-several-files-tip", "La taille de l'écran distant a changé pendant l'enregistrement : la vidéo est découpée en plusieurs fichiers dans ce dossier. Voici le dernier."),
         ("rtdesk-record-not-saved-tip", "Aucune vidéo n'a été enregistrée : l'enregistrement a duré moins d'une seconde, ou le dossier d'enregistrement n'est pas accessible. Dossier :"),
         ("rtdesk-open-folder", "Ouvrir le dossier"),
+        ("rtdesk-enter-id-tip", "Saisissez l'ID de l'appareil."),
+        ("rtdesk-already-open-tip", "Cet appareil est déjà ouvert dans un onglet."),
     ].iter().cloned().collect();
 }

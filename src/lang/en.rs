@@ -283,5 +283,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("rtdesk-record-several-files-tip", "The remote screen size changed during the recording, so the video is split into several files in this folder. This is the last one."),
         ("rtdesk-record-not-saved-tip", "No video was saved: the recording lasted less than one second, or the recording folder can't be written. Folder:"),
         ("rtdesk-open-folder", "Open folder"),
+        ("rtdesk-enter-id-tip", "Enter the device ID."),
+        ("rtdesk-already-open-tip", "This device is already open in a tab."),
     ].iter().cloned().collect();
 }
